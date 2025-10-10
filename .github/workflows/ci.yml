@@ -27,6 +27,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Extract Python version from Dockerfile
+        id: extract-version
+        run: |
+          PYTHON_FULL_VERSION=$(grep '^ENV PYTHON_VERSION' ${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile | awk '{print $3}')
+          echo "python-full-version=$PYTHON_FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "Python full version: $PYTHON_FULL_VERSION"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -74,6 +81,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Extract Python version from Dockerfile
+        id: extract-version
+        run: |
+          PYTHON_FULL_VERSION=$(grep '^ENV PYTHON_VERSION' ${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile | awk '{print $3}')
+          echo "python-full-version=$PYTHON_FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "Python full version: $PYTHON_FULL_VERSION"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -125,6 +139,16 @@ jobs:
             variant: 'slim-trixie'
             is-latest: true
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Extract Python version from Dockerfile
+        id: extract-version
+        run: |
+          PYTHON_FULL_VERSION=$(grep '^ENV PYTHON_VERSION' ${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile | awk '{print $3}')
+          echo "python-full-version=$PYTHON_FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "Python full version: $PYTHON_FULL_VERSION"
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -133,13 +157,25 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          # メインのバージョン付きタグ
+          PYTHON_FULL_VERSION="${{ steps.extract-version.outputs.python-full-version }}"
+          
+          # メインのバージョン付きタグ (3.14-slim-trixie)
           docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }} \
             ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
             ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
           
-          # Python バージョンのみのタグ
+          # フルバージョン付きタグ (3.14.0-slim-trixie)
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${PYTHON_FULL_VERSION}-${{ matrix.variant }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          
+          # Python バージョンのみのタグ (3.14)
           docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          
+          # Python フルバージョンのみのタグ (3.14.0)
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${PYTHON_FULL_VERSION} \
             ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
             ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
 
