@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  docker:
+  docker-amd64:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,16 +21,11 @@ jobs:
         include:
           - python-version: '3.14'
             variant: 'slim-trixie'
-            platforms: 'linux/amd64,linux/arm64'
+            platform: 'linux/amd64'
             is-latest: true
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,34 +36,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil
-          tags: |
-            type=ref,event=tag
-            type=raw,value=${{ matrix.python-version }}-${{ matrix.variant }}
-            type=raw,value=${{ matrix.python-version }}
-            type=raw,value=latest,enable=${{ matrix.is-latest && github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Build and push Docker image
+      - name: Build and push Docker image (amd64)
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.python-version }}/${{ matrix.variant }}
           file: ./${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile
-          platforms: ${{ matrix.platforms }}
+          platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.python-version }}-${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.python-version }}-${{ matrix.variant }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64
+          labels: |
+            org.opencontainers.image.version=${{ matrix.python-version }}
+            org.opencontainers.image.variant=${{ matrix.variant }}
+          cache-from: type=gha,scope=${{ matrix.python-version }}-${{ matrix.variant }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.python-version }}-${{ matrix.variant }}-amd64
 
       - name: Test Docker image (amd64)
         run: |
-          docker run --rm --platform linux/amd64 ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }} \
+          docker run --rm --platform linux/amd64 ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
             python -c "
           import sys
           print(f'Python {sys.version}')
@@ -77,9 +61,51 @@ jobs:
           print('✓ GIL is successfully disabled')
           "
 
+  docker-arm64:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: '3.14'
+            variant: 'slim-trixie'
+            platform: 'linux/arm64'
+            is-latest: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.python-version }}/${{ matrix.variant }}
+          file: ./${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          labels: |
+            org.opencontainers.image.version=${{ matrix.python-version }}
+            org.opencontainers.image.variant=${{ matrix.variant }}
+          cache-from: type=gha,scope=${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          cache-to: type=gha,mode=max,scope=${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+
       - name: Test Docker image (arm64)
         run: |
-          docker run --rm --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }} \
+          docker run --rm --platform linux/arm64 ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64 \
             python -c "
           import sys
           print(f'Python {sys.version}')
@@ -87,3 +113,56 @@ jobs:
           assert not sys.flags.gil, 'GIL is not disabled'
           print('✓ GIL is successfully disabled')
           "
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: [docker-amd64, docker-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: '3.14'
+            variant: 'slim-trixie'
+            is-latest: true
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          # メインのバージョン付きタグ
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          
+          # Python バージョンのみのタグ
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+
+      - name: Create and push latest tag
+        if: matrix.is-latest && github.ref == 'refs/heads/main'
+        run: |
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:latest \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+
+      - name: Create and push semver tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f1-2)
+          
+          # フルバージョンタグ
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:$VERSION \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
+          
+          # メジャー.マイナーバージョンタグ
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:$MINOR \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-nogil:${{ matrix.python-version }}-${{ matrix.variant }}-arm64
