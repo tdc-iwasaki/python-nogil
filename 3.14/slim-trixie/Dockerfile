@@ -66,6 +66,7 @@ RUN set -eux; \
 		--enable-shared \
 		$(test "${gnuArch%%-*}" != 'riscv64' && echo '--with-lto') \
 		--with-ensurepip \
+		--disable-gil \
 	; \
 	nproc="$(nproc)"; \
 	EXTRA_CFLAGS="$(dpkg-buildflags --get CFLAGS)"; \
