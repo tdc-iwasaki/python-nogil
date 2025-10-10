@@ -1,0 +1,36 @@
+# Docker イメージのバージョン管理設定
+
+## マトリックス定義
+# 新しいバージョンやバリアントを追加する場合はここに記載
+
+versions:
+  - python-version: "3.14"
+    variant: "slim-trixie"
+    platforms: "linux/amd64,linux/arm64"
+    is-latest: true
+    auto-update: true
+
+  # 将来のバージョン例:
+  # - python-version: "3.14"
+  #   variant: "alpine"
+  #   platforms: "linux/amd64,linux/arm64"
+  #   is-latest: false
+  #   auto-update: true
+  #
+  # - python-version: "3.15"
+  #   variant: "slim-trixie"
+  #   platforms: "linux/amd64,linux/arm64"
+  #   is-latest: true
+  #   auto-update: true
+
+## タグ戦略
+# 各ビルドで生成されるタグ:
+# 1. {python-version}-{variant}  例: 3.14-slim-trixie
+# 2. {python-version}            例: 3.14
+# 3. latest                      例: latest (is-latest=true の場合のみ)
+# 4. v{semantic-version}         例: v1.0.0 (Gitタグがある場合)
+# 5. {major}.{minor}             例: 1.0 (Gitタグがある場合)
+
+## 自動更新設定
+# auto-update: true の場合、週次で新バージョンをチェックし、
+# 更新があれば自動的にPRを作成します

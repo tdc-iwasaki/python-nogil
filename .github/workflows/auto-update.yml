@@ -1,0 +1,90 @@
+name: Auto Update Python Version
+
+on:
+  schedule:
+    # 毎週月曜日の午前9時（JST）に実行
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    outputs:
+      has-update: ${{ steps.check.outputs.has-update }}
+      new-version: ${{ steps.check.outputs.new-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for new Python version
+        id: check
+        run: |
+          # 現在のバージョンを取得
+          CURRENT_VERSION=$(grep -oP 'ENV PYTHON_VERSION \K[0-9.]+' 3.14/slim-trixie/Dockerfile | head -1)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Python.orgから最新の3.14系バージョンを取得
+          LATEST_VERSION=$(curl -s https://www.python.org/ftp/python/ | \
+            grep -oP 'href="3\.14\.\d+/"' | \
+            grep -oP '3\.14\.\d+' | \
+            sort -V | \
+            tail -1)
+          echo "Latest version: $LATEST_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "has-update=true" >> $GITHUB_OUTPUT
+            echo "new-version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "✓ New version available: $LATEST_VERSION"
+          else
+            echo "has-update=false" >> $GITHUB_OUTPUT
+            echo "✓ Already up to date"
+          fi
+
+  create-pr:
+    needs: check-update
+    if: needs.check-update.outputs.has-update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Dockerfile
+        run: |
+          NEW_VERSION="${{ needs.check-update.outputs.new-version }}"
+          
+          # バージョン番号を更新
+          sed -i "s/ENV PYTHON_VERSION .*/ENV PYTHON_VERSION $NEW_VERSION/" 3.14/slim-trixie/Dockerfile
+          
+          # SHA256を取得して更新
+          TARBALL_URL="https://www.python.org/ftp/python/$NEW_VERSION/Python-$NEW_VERSION.tar.xz"
+          NEW_SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
+          sed -i "s/ENV PYTHON_SHA256 .*/ENV PYTHON_SHA256 $NEW_SHA256/" 3.14/slim-trixie/Dockerfile
+          
+          echo "Updated to Python $NEW_VERSION"
+          echo "SHA256: $NEW_SHA256"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update Python to ${{ needs.check-update.outputs.new-version }}'
+          title: 'Update Python to ${{ needs.check-update.outputs.new-version }}'
+          body: |
+            ## 🐍 Python Version Update
+            
+            This PR updates Python from the current version to **${{ needs.check-update.outputs.new-version }}**.
+            
+            ### Changes
+            - Updated `PYTHON_VERSION` in Dockerfile
+            - Updated `PYTHON_SHA256` checksum
+            
+            ### Verification
+            The Docker image will be automatically built and tested when this PR is merged.
+            
+            ---
+            🤖 This PR was automatically created by the auto-update workflow.
+          branch: auto-update/python-${{ needs.check-update.outputs.new-version }}
+          delete-branch: true
+          labels: |
+            automated
+            python-update
