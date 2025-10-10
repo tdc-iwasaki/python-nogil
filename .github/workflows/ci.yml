@@ -6,6 +6,10 @@ on:
       - 'v*.*.*'
     branches:
       - main
+    paths:
+      - '3.14/**'
+      - '.github/workflows/ci.yml'
+      - '!**/*.md'
   workflow_dispatch:
 
 jobs:
