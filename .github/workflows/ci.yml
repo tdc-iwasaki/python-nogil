@@ -25,7 +25,7 @@ jobs:
             is-latest: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Extract Python version from Dockerfile
         id: extract-version
@@ -80,7 +80,7 @@ jobs:
             is-latest: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Extract Python version from Dockerfile
         id: extract-version
@@ -140,7 +140,7 @@ jobs:
             is-latest: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Extract Python version from Dockerfile
         id: extract-version
