@@ -2,8 +2,8 @@ name: Auto Update Python Version
 
 on:
   schedule:
-    # 毎週月曜日の午前9時（JST）に実行
-    - cron: '0 0 * * 1'
+    # 毎日午前9時（JST）に実行
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 permissions:
