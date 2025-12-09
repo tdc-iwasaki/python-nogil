@@ -1,4 +1,3 @@
-
 # Python NoGIL Docker Images
 
 Python 公式イメージをもとに GIL (Global Interpreter Lock) を無効化したイメージです。  
@@ -19,14 +18,14 @@ docker run -it tdciwasaki/python-nogil:latest python
 
 | タグ | Python バージョン | ベースイメージ | プラットフォーム |
 |------|------------------|---------------|-----------------|
-| `latest`, `3.14`, `3.14-slim-trixie` | 3.14.0 | Debian Trixie Slim | amd64, arm64 |
+| `latest`, `3.14`, `3.14-slim-trixie` | 3.14.2 | Debian Trixie Slim | amd64, arm64 |
 
 ### タグの説明
 
 - `latest`: 最新の安定版（常に `main` ブランチの最新ビルド）
 - `3.14`: Python 3.14 系の最新版
+- `3.14.x`: Python バージョンを指定（例: `3.14.2`）
 - `3.14-slim-trixie`: Python 3.14 + Debian Trixie Slim の組み合わせ
-- `v*.*.*`: セマンティックバージョニングによるリリースタグ
 
 ## ✅ GIL 無効化の確認
 
