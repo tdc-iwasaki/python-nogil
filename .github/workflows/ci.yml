@@ -44,7 +44,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image (amd64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./${{ matrix.python-version }}/${{ matrix.variant }}
           file: ./${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile
@@ -104,7 +104,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image (arm64)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./${{ matrix.python-version }}/${{ matrix.variant }}
           file: ./${{ matrix.python-version }}/${{ matrix.variant }}/Dockerfile
