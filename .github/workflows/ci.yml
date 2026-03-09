@@ -90,7 +90,7 @@ jobs:
           echo "Python full version: $PYTHON_FULL_VERSION"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: linux/arm64
 
