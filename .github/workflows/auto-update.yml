@@ -27,13 +27,16 @@ jobs:
           CURRENT_VERSION=$(grep -oP 'ENV PYTHON_VERSION \K[0-9.]+' 3.14/slim-trixie/Dockerfile | head -1)
           echo "Current version: $CURRENT_VERSION"
           
-          # Python.orgから最新の3.14系バージョンを取得
-          LATEST_VERSION=$(curl -s https://www.python.org/ftp/python/ | \
-            grep -oP 'href="3\.14\.\d+/"' | \
-            grep -oP '3\.14\.\d+' | \
-            sort -V | \
-            tail -1)
+          # upstream の docker-library/python Dockerfile から最新の3.14系バージョンを取得
+          UPSTREAM_DOCKERFILE="https://raw.githubusercontent.com/docker-library/python/master/3.14/slim-trixie/Dockerfile"
+          LATEST_VERSION=$(curl -sf "$UPSTREAM_DOCKERFILE" | \
+            grep -oP 'ENV PYTHON_VERSION \K[0-9]+\.[0-9]+\.[0-9]+$')
           echo "Latest version: $LATEST_VERSION"
+          
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "::error::Failed to retrieve latest version from upstream Dockerfile"
+            exit 1
+          fi
           
           if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
             echo "has-update=true" >> $GITHUB_OUTPUT
